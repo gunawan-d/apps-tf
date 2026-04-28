@@ -1,0 +1,127 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, master, develop ]
+    paths-ignore:
+      - '**.md'
+      - 'README.md'
+  pull_request:
+    branches: [ main, master, develop ]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: hello-world-app
+  IMAGE_TAG: ${{ github.sha }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and Push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-session
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+          mask-password: 'true'
+
+      - name: Build, tag, and push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        
+      - name: Generate image URI
+        run: echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}" >> $GITHUB_ENV
+
+  codebuild-deploy:
+    name: Deploy via AWS CodeBuild
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-actions-codebuild-session
+
+      - name: Start CodeBuild deployment
+        id: codebuild
+        run: |
+          aws codebuild start-build \
+            --project-name ${{ secrets.CODEBUILD_PROJECT_NAME }} \
+            --environment-variables-override name=IMAGE_TAG,value=${{ env.IMAGE_TAG }},type=PLAINTEXT \
+            --source-version ${{ github.sha }}
+          echo "CodeBuild deployment started for commit ${{ github.sha }}"
+        
+      - name: Wait for CodeBuild completion
+        run: |
+          BUILD_ID=$(aws codebuild batch-get-builds --ids $(aws codebuild list-builds-for-project --project-name ${{ secrets.CODEBUILD_PROJECT_NAME }} --query 'ids[0]' --output text) --query 'builds[0].id' --output text)
+          echo "Build ID: $BUILD_ID"
+          
+          timeout=1800
+          interval=30
+          elapsed=0
+          
+          while [ $elapsed -lt $timeout ]; do
+            STATUS=$(aws codebuild batch-get-builds --ids $BUILD_ID --query 'builds[0].buildStatus' --output text)
+            echo "Build status: $STATUS (elapsed: ${elapsed}s)"
+            
+            if [ "$STATUS" = "SUCCEEDED" ]; then
+              echo "CodeBuild deployment completed successfully!"
+              exit 0
+            elif [ "$STATUS" = "IN_PROGRESS" ]; then
+              sleep $interval
+              elapsed=$((elapsed + interval))
+            else
+              echo "Build failed with status: $STATUS"
+              exit 1
+            fi
+          done
+          
+          echo "Build timed out after ${timeout}s"
+          exit 1
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Run Go tests
+        run: go test -v ./...
+
+      - name: Build application
+        run: go build -v .
