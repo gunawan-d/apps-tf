@@ -14,7 +14,7 @@ COPY main.go ./
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
 # Runtime stage
-FROM alpine:latest
+FROM golang:1.21-alpine AS Production
 
 RUN apk --no-cache add ca-certificates tzdata
 
