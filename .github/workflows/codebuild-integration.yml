@@ -7,7 +7,7 @@ on:
     branches: [ main, master, develop ]
 
 env:
-  AWS_REGION: ap-southeast-1
+  AWS_REGION: ap-southeast-3
   CODEBUILD_PROJECT_NAME: apps-tf-codebuild
 
 jobs:
