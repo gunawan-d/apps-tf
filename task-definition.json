@@ -1,5 +1,5 @@
 {
-  "family": "apps-tf-task",
+  "family": "app-task",
   "executionRoleArn": "arn:aws:iam::148963274465:role/app-gunawan-cluster-execution-role",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
