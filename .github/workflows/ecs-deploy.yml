@@ -5,77 +5,75 @@ on:
     branches: [ main ]
 
 jobs:
-  build:
-    name: Build & Push to ECR
-    runs-on: ubuntu-latest
-    environment: prod
-    outputs:
-      image: ${{ steps.build_and_push.outputs.image }}
-    env:
-      ECR_REPOSITORY: apps-tf
-      IMAGE_TAG: latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
-
-    - name: Login to Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
-
-    - name: Build, tag, and push image to Amazon ECR
-      id: build_and_push
-      run: |
-        IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-        docker build -t $IMAGE .
-        docker push $IMAGE
-        echo "image=$IMAGE" >> $GITHUB_OUTPUT
-
   deploy:
-    name: Deploy to ECS
+    name: Build and Deploy
     runs-on: ubuntu-latest
     environment: prod
-    needs: build
-    env:
-      ECR_REPOSITORY: apps-tf
-      IMAGE_TAG: latest
-      ECS_SERVICE: app-service
-      ECS_CLUSTER: app-gunawan-cluster
+
+    permissions:
+      contents: read
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
+    #  AWS Auth
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+    #  Login ECR
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
 
+    # uild & Push Image
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        ECR_REPOSITORY: apps-tf   # repo tetap boleh ini
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        set -e
+
+        FULL_IMAGE=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+        echo "Building image: $FULL_IMAGE"
+        docker build -t $FULL_IMAGE .
+
+        echo "Pushing image..."
+        docker push $FULL_IMAGE
+
+        echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+
+    #  Debug image
+    - name: Debug image output
+      run: echo "IMAGE => ${{ steps.build-image.outputs.image }}"
+
+    #  Render Task Definition (FIX DI SINI)
     - name: Render Amazon ECS task definition
       id: render-task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-definition.json
-        container-name: apps-tf
-        image: ${{ needs.build.outputs.image || format('{0}.dkr.ecr.{1}.amazonaws.com/{2}:{3}', secrets.AWS_ACCOUNT_ID || 'ACCOUNT_ID', secrets.AWS_REGION || 'us-east-1', env.ECR_REPOSITORY, env.IMAGE_TAG) }}
+        container-name: app-tf   # 🔥 FIX DI SINI
+        image: ${{ steps.build-image.outputs.image }}
 
+    #  Debug hasil render
+    - name: Debug rendered task definition
+      run: |
+        echo "===== RENDERED TASK DEF ====="
+        cat ${{ steps.render-task-def.outputs.task-definition }}
+
+    #  Deploy
     - name: Deploy to Amazon ECS service
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
+        service: app-service
+        cluster: app-gunawan-cluster
+        wait-for-service-stability: false

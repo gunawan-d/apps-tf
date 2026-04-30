@@ -1,13 +1,14 @@
 {
-  "family": "apps-tf-task",
+  "family": "app-task",
+  "executionRoleArn": "arn:aws:iam::148963274465:role/app-gunawan-cluster-execution-role",
   "networkMode": "awsvpc",
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "256",
   "memory": "512",
   "containerDefinitions": [
     {
-      "name": "apps-tf",
-      "image": "${IMAGE}",
+      "name": "app-tf",
+      "image": "PLACEHOLDER",
       "essential": true,
       "portMappings": [
         {
@@ -25,9 +26,10 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/apps-tf",
+          "awslogs-group": "/ecs/app-tf",
           "awslogs-region": "us-east-1",
-          "awslogs-stream-prefix": "ecs"
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
         }
       },
       "environment": [
