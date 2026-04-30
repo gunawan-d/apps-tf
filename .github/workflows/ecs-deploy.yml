@@ -2,7 +2,7 @@ name: CI/CD to ECS
 
 on:
   push:
-    branches: [ main, devsecops-task-definition ]
+    branches: [ main ]
 
 jobs:
   deploy:
@@ -17,7 +17,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 🔐 AWS Auth
+    #  AWS Auth
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -25,12 +25,12 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # 🐳 Login ECR
+    #  Login ECR
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
 
-    # 🏗️ Build & Push Image
+    # uild & Push Image
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
@@ -50,11 +50,11 @@ jobs:
 
         echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
 
-    # 🔍 Debug image
+    #  Debug image
     - name: Debug image output
       run: echo "IMAGE => ${{ steps.build-image.outputs.image }}"
 
-    # 🧠 Render Task Definition (FIX DI SINI)
+    #  Render Task Definition (FIX DI SINI)
     - name: Render Amazon ECS task definition
       id: render-task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -63,17 +63,17 @@ jobs:
         container-name: app-tf   # 🔥 FIX DI SINI
         image: ${{ steps.build-image.outputs.image }}
 
-    # 🔍 Debug hasil render
+    #  Debug hasil render
     - name: Debug rendered task definition
       run: |
         echo "===== RENDERED TASK DEF ====="
         cat ${{ steps.render-task-def.outputs.task-definition }}
 
-    # 🚀 Deploy
+    #  Deploy
     - name: Deploy to Amazon ECS service
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.render-task-def.outputs.task-definition }}
         service: app-service
         cluster: app-gunawan-cluster
-        wait-for-service-stability: true
+        wait-for-service-stability: false
