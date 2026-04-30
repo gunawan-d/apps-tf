@@ -7,7 +7,7 @@
   "memory": "512",
   "containerDefinitions": [
     {
-      "name": "apps-tf",
+      "name": "app-tf",
       "image": "PLACEHOLDER",
       "essential": true,
       "portMappings": [
@@ -26,7 +26,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/apps-tf",
+          "awslogs-group": "/ecs/app-tf",
           "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
