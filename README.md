@@ -1,6 +1,6 @@
-# Hello World Fullstack Application
+# Hello World
 
-Simple Hello World application with Go backend and vanilla JavaScript frontend.
+Simple Hello World application with Go backend 
 
 ## Infrastructure
 
