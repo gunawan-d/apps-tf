@@ -7,7 +7,7 @@
   "containerDefinitions": [
     {
       "name": "apps-tf",
-      "image": "***.dkr.ecr.***.amazonaws.com/apps-tf:latest",
+      "image": "${IMAGE}",
       "essential": true,
       "portMappings": [
         {
@@ -26,7 +26,7 @@
         "logDriver": "awslogs",
         "options": {
           "awslogs-group": "/ecs/apps-tf",
-          "awslogs-region": "***",
+          "awslogs-region": "us-east-1",
           "awslogs-stream-prefix": "ecs"
         }
       },
