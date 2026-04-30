@@ -7,7 +7,7 @@
   "containerDefinitions": [
     {
       "name": "apps-tf",
-      "image": "${IMAGE}",
+      "image": "<IMAGE>",
       "essential": true,
       "portMappings": [
         {
