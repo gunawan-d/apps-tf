@@ -2,25 +2,26 @@ name: CI/CD to ECS
 
 on:
   push:
-    branches: [ main,devsecops-task-definition ]
+    branches: [ main, devsecops-task-definition ]
 
 jobs:
   build:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
     environment: prod
+    # Mendefinisikan output agar bisa dibaca oleh job deploy
     outputs:
       image: ${{ steps.build_and_push.outputs.image }}
     env:
       ECR_REPOSITORY: apps-tf
-      IMAGE_TAG: latest
+      IMAGE_TAG: ${{ github.sha }} # Menggunakan SHA commit agar image selalu unik
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v1
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -28,31 +29,36 @@ jobs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Build, tag, and push image to Amazon ECR
       id: build_and_push
       run: |
-        IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
-        docker build -t $IMAGE .
-        docker push $IMAGE
-        echo "image=$IMAGE" >> $GITHUB_OUTPUT
+        # Membentuk string URL Image
+        IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+        
+        # Proses Build dan Push
+        docker build -t $IMAGE_URI .
+        docker push $IMAGE_URI
+        
+        # Menyimpan nilai IMAGE_URI ke output GitHub Actions
+        echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy to ECS
     runs-on: ubuntu-latest
     environment: prod
-    needs: build
+    needs: build # Menunggu job build selesai
     env:
       ECS_SERVICE: app-service
       ECS_CLUSTER: app-gunawan-cluster
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4 # Update ke v4
+      uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -64,11 +70,11 @@ jobs:
       with:
         task-definition: task-definition.json
         container-name: apps-tf
-        # Ambil langsung dari output job build tanpa fallback aneh
+        # Mengambil data output dari job build secara langsung
         image: ${{ needs.build.outputs.image }}
 
     - name: Deploy to Amazon ECS service
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v2 # Update ke v2
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.render-task-def.outputs.task-definition }}
         service: ${{ env.ECS_SERVICE }}
