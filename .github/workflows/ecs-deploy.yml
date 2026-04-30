@@ -9,14 +9,10 @@ jobs:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
     environment: prod
-    # Mendefinisikan output job agar bisa dibaca job lain
+    # 1. Pastikan bagian outputs ini tidak menjorok terlalu dalam
     outputs:
-      image: ${{ steps.build_and_push.outputs.image }}
+      image: ${{ steps.build_push_step.outputs.image }}
     
-    env:
-      ECR_REPOSITORY: apps-tf
-      IMAGE_TAG: ${{ github.sha }}
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -33,30 +29,24 @@ jobs:
       uses: aws-actions/amazon-ecr-login@v2
 
     - name: Build, tag, and push image to Amazon ECR
-      id: build_and_push
+      id: build_push_step
       run: |
-        # Membentuk variabel lokal
         REGISTRY=${{ steps.login-ecr.outputs.registry }}
-        REPO=${{ env.ECR_REPOSITORY }}
-        TAG=${{ env.IMAGE_TAG }}
-        FULL_IMAGE=$REGISTRY/$REPO:$TAG
+        REPO="apps-tf"
+        TAG=${{ github.sha }}
+        FULL_IMAGE="$REGISTRY/$REPO:$TAG"
         
-        # Proses Docker
         docker build -t $FULL_IMAGE .
         docker push $FULL_IMAGE
         
-        # MENULIS KE OUTPUT (Gunakan variabel yang sudah fix)
-        echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
+        # 2. Menggunakan format terbaru untuk menulis output
+        echo "image=$FULL_IMAGE" >> "$GITHUB_OUTPUT"
 
   deploy:
     name: Deploy to ECS
     runs-on: ubuntu-latest
     environment: prod
-    needs: build # Menghubungkan job deploy dengan build
-    env:
-      ECS_SERVICE: app-service
-      ECS_CLUSTER: app-gunawan-cluster
-
+    needs: build
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -68,19 +58,23 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+    # 3. Step tambahan untuk memastikan variabel masuk
+    - name: Verify Image Variable
+      run: |
+        echo "Image yang diterima dari build job: ${{ needs.build.outputs.image }}"
+
     - name: Render Amazon ECS task definition
       id: render-task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-definition.json
         container-name: apps-tf
-        # Pastikan tidak ada spasi tambahan di sini
         image: ${{ needs.build.outputs.image }}
 
     - name: Deploy to Amazon ECS service
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
         task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
+        service: app-service
+        cluster: app-gunawan-cluster
         wait-for-service-stability: true
