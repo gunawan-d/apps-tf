@@ -8,7 +8,7 @@
   "containerDefinitions": [
     {
       "name": "apps-tf",
-      "image": "",
+      "image": "PLACEHOLDER",
       "essential": true,
       "portMappings": [
         {
