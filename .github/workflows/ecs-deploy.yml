@@ -70,7 +70,7 @@ jobs:
       with:
         task-definition: task-definition.json
         container-name: apps-tf
-        image: ${{ needs.build.outputs.image }}
+        image: ${{ needs.build.outputs.image || format('{0}.dkr.ecr.{1}.amazonaws.com/{2}:{3}', secrets.AWS_ACCOUNT_ID || 'ACCOUNT_ID', secrets.AWS_REGION || 'us-east-1', env.ECR_REPOSITORY, env.IMAGE_TAG) }}
 
     - name: Deploy to Amazon ECS service
       uses: aws-actions/amazon-ecs-deploy-task-definition@v1
