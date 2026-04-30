@@ -9,12 +9,13 @@ jobs:
     name: Build & Push to ECR
     runs-on: ubuntu-latest
     environment: prod
-    # Mendefinisikan output agar bisa dibaca oleh job deploy
+    # Pastikan bagian 'outputs' ini sejajar dengan 'name' atau 'runs-on'
     outputs:
       image: ${{ steps.build_and_push.outputs.image }}
+    
     env:
       ECR_REPOSITORY: apps-tf
-      IMAGE_TAG: ${{ github.sha }} # Menggunakan SHA commit agar image selalu unik
+      IMAGE_TAG: ${{ github.sha }}
 
     steps:
     - name: Checkout code
@@ -41,14 +42,14 @@ jobs:
         docker build -t $IMAGE_URI .
         docker push $IMAGE_URI
         
-        # Menyimpan nilai IMAGE_URI ke output GitHub Actions
+        # MENYIMPAN OUTPUT (PENTING)
         echo "image=$IMAGE_URI" >> $GITHUB_OUTPUT
 
   deploy:
     name: Deploy to ECS
     runs-on: ubuntu-latest
     environment: prod
-    needs: build # Menunggu job build selesai
+    needs: build # Menghubungkan job deploy dengan build
     env:
       ECS_SERVICE: app-service
       ECS_CLUSTER: app-gunawan-cluster
@@ -70,7 +71,7 @@ jobs:
       with:
         task-definition: task-definition.json
         container-name: apps-tf
-        # Mengambil data output dari job build secara langsung
+        # Mengambil data dari job 'build' melalui konteks 'needs'
         image: ${{ needs.build.outputs.image }}
 
     - name: Deploy to Amazon ECS service
