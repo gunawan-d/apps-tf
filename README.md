@@ -21,7 +21,7 @@ Git Push → GitHub Actions → Build & Push to ECR → CodePipeline → Deploy 
 
 ## Application Architecture
 
-![Application Architecture](image.png)
+![Application Architecture](image-1.png)
 
 ## Project Structure
 
