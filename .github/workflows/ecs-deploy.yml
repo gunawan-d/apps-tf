@@ -35,7 +35,7 @@ jobs:
       id: build-image
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        ECR_REPOSITORY: apps-tf
+        ECR_REPOSITORY: apps-tf   # repo tetap boleh ini
         IMAGE_TAG: ${{ github.sha }}
       run: |
         set -e
@@ -50,26 +50,26 @@ jobs:
 
         echo "image=$FULL_IMAGE" >> $GITHUB_OUTPUT
 
-    # 🔍 Debug image (WAJIB buat validasi)
+    # 🔍 Debug image
     - name: Debug image output
       run: echo "IMAGE => ${{ steps.build-image.outputs.image }}"
 
-    # 🧠 Render Task Definition
+    # 🧠 Render Task Definition (FIX DI SINI)
     - name: Render Amazon ECS task definition
       id: render-task-def
       uses: aws-actions/amazon-ecs-render-task-definition@v1
       with:
         task-definition: task-definition.json
-        container-name: apps-tf
+        container-name: app-tf   # 🔥 FIX DI SINI
         image: ${{ steps.build-image.outputs.image }}
 
-    # 🔍 Debug hasil render (INI YANG PALING PENTING)
+    # 🔍 Debug hasil render
     - name: Debug rendered task definition
       run: |
         echo "===== RENDERED TASK DEF ====="
         cat ${{ steps.render-task-def.outputs.task-definition }}
 
-    # 🚀 Deploy ke ECS
+    # 🚀 Deploy
     - name: Deploy to Amazon ECS service
       uses: aws-actions/amazon-ecs-deploy-task-definition@v2
       with:
